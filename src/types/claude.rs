@@ -224,6 +224,9 @@ pub enum ContentBlock {
         tool_use_id: String,
         content: serde_json::Value,
     },
+    /// Thinking/reasoning content (extended thinking mode)
+    #[serde(rename = "thinking")]
+    Thinking { thinking: String },
 }
 
 /// Source of an image

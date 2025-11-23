@@ -97,6 +97,7 @@ where
 }
 
 pub fn transforms_json(input: CreateMessageResponse) -> Value {
+    // Extract text content
     let content = input
         .content
         .iter()
@@ -105,6 +106,21 @@ pub fn transforms_json(input: CreateMessageResponse) -> Value {
             _ => None,
         })
         .collect::<String>();
+
+    // Extract thinking blocks for extended thinking mode
+    let thinking_blocks: Vec<Value> = input
+        .content
+        .iter()
+        .filter_map(|block| match block {
+            crate::types::claude::ContentBlock::Thinking { thinking } => {
+                Some(serde_json::json!({
+                    "type": "thinking",
+                    "thinking": thinking
+                }))
+            }
+            _ => None,
+        })
+        .collect();
 
     let usage = input.usage.as_ref().map(|u| {
         serde_json::json!({
@@ -123,6 +139,17 @@ pub fn transforms_json(input: CreateMessageResponse) -> Value {
         None => "stop",
     };
 
+    // Build message object with optional thinking_blocks
+    let mut message = serde_json::json!({
+        "role": "assistant",
+        "content": content
+    });
+
+    // Add thinking_blocks if present (for litellm/OpenHands compatibility)
+    if !thinking_blocks.is_empty() {
+        message["thinking_blocks"] = serde_json::json!(thinking_blocks);
+    }
+
     serde_json::json!({
         "id": input.id,
         "object": "chat.completion",
@@ -133,10 +160,7 @@ pub fn transforms_json(input: CreateMessageResponse) -> Value {
         "model": input.model,
         "choices": [{
             "index": 0,
-            "message": {
-                "role": "assistant",
-                "content": content
-            },
+            "message": message,
             "finish_reason": finish_reason
         }],
         "usage": usage
